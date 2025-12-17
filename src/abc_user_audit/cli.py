@@ -2,7 +2,6 @@ import argparse
 from dataclasses import dataclass
 from typing import List, Optional
 
-import great_expectations as ge
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from email_validator import EmailNotValidError, validate_email
@@ -22,15 +21,10 @@ class Anomaly:
 
 def load_users(csv_path: str) -> pd.DataFrame:
     """Load the legacy users export and parse dates where possible."""
-    df = pd.read_csv(csv_path, dtype=str).applymap(
-        lambda x: x.strip() if isinstance(x, str) else x
-    )
-    df["birth_date_parsed"] = pd.to_datetime(
-        df["birth_date"], errors="coerce", infer_datetime_format=True
-    )
-    df["created_at_parsed"] = pd.to_datetime(
-        df["created_at"], errors="coerce", infer_datetime_format=True
-    )
+    df = pd.read_csv(csv_path, dtype=str)
+    df = df.apply(lambda col: col.str.strip() if col.dtype == "object" else col)
+    df["birth_date_parsed"] = pd.to_datetime(df["birth_date"], errors="coerce")
+    df["created_at_parsed"] = pd.to_datetime(df["created_at"], errors="coerce")
     return df
 
 
@@ -96,35 +90,6 @@ def run_anomaly_checks(df: pd.DataFrame) -> pd.DataFrame:
         all_anomalies.extend(validate_row(row))
     return pd.DataFrame([a.__dict__ for a in all_anomalies])
 
-
-def run_expectations(df: pd.DataFrame) -> pd.DataFrame:
-    """Run a handful of Great Expectations checks and return a compact summary."""
-    gx_df = ge.from_pandas(df)
-    results = [
-        gx_df.expect_column_values_to_not_be_null("id"),
-        gx_df.expect_column_values_to_not_be_null("first_name"),
-        gx_df.expect_column_values_to_not_be_null("last_name"),
-        gx_df.expect_column_values_to_not_be_null("email"),
-        gx_df.expect_column_values_to_not_be_null("phone"),
-        gx_df.expect_column_values_to_not_be_null("status"),
-        gx_df.expect_column_values_to_be_in_set("status", list(ALLOWED_STATUSES)),
-        gx_df.expect_column_values_to_match_regex("phone", r"^\\d{10}$"),
-        gx_df.expect_column_values_to_match_regex("birth_date", r"^\\d{1,2}/\\d{1,2}/\\d{4}$"),
-        gx_df.expect_column_values_to_match_regex("created_at", r"^\\d{1,2}/\\d{1,2}/\\d{4}( .*)?$"),
-    ]
-    return pd.DataFrame(
-        {
-            "expectation": [
-                res["expectation_config"]["expectation_type"] for res in results
-            ],
-            "success": [res["success"] for res in results],
-            "unexpected_percent": [
-                res["result"].get("unexpected_percent", 0) for res in results
-            ],
-        }
-    )
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run data quality checks against the legacy users CSV."
@@ -143,14 +108,24 @@ def main() -> None:
 
     df = load_users(args.csv)
     anomalies = run_anomaly_checks(df)
-    expectations = run_expectations(df)
-
-    print("\nGreat Expectations summary:")
-    print(expectations.to_string(index=False))
 
     print(f"\nAnomalies found: {len(anomalies)}")
-    if not anomalies.empty:
+    if anomalies.empty:
+        print("No anomalies detected.")
+    else:
+        # Summary of counts by issue type
+        counts = (
+            anomalies.groupby("issue")
+            .size()
+            .sort_values(ascending=False)
+            .reset_index(name="count")
+        )
+        print("\nCounts by issue:")
+        print(counts.to_string(index=False))
+
+        print("\nSample anomalies (first 20):")
         print(anomalies.head(20).to_string(index=False))
+
         if args.anomalies_out:
             anomalies.to_csv(args.anomalies_out, index=False)
             print(f"\nFull anomalies written to {args.anomalies_out}")
