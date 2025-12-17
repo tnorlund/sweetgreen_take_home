@@ -46,7 +46,8 @@ def validate_row(row: pd.Series) -> List[Anomaly]:
     email_value = row.get("email")
     if pd.notna(email_value):
         try:
-            validate_email(str(email_value))
+            # Disable DNS lookups for speed; only validate syntax.
+            validate_email(str(email_value), check_deliverability=False)
         except EmailNotValidError as exc:
             add("email", f"invalid email: {exc}", str(email_value))
 

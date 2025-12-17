@@ -21,6 +21,6 @@ abc-audit --csv "challenge_dataset (1).csv" --anomalies-out anomalies.csv
 
 ## Notes
 
-- Dependencies are managed via `pyproject.toml` (build backend: hatchling). Great Expectations was removed to keep the runtime lean for this single CSV; the CLI uses custom validators for the specified business rules (e.g., phone must be exactly 10 digits to match the target `int(10)` column).
+- Dependencies are managed via `pyproject.toml` (build backend: hatchling). Great Expectations was removed to keep the runtime lean for this single CSV; the CLI uses custom validators for the specified business rules (e.g., phone must be exactly 10 digits to match the target `int(10)` column, and email validation is syntax-only to avoid DNS lookups).
 - The source package lives under `src/abc_user_audit`. Add modules there for validators, anomaly reporting, and CLI entrypoints.
 - CSV/inputs for the exercise are in the repository root.
