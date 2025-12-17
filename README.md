@@ -8,6 +8,9 @@ Python package to analyze the legacy `users_old` export (`challenge_dataset (1).
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
+
+# Run checks
+abc-audit --csv "challenge_dataset (1).csv" --anomalies-out anomalies.csv
 ```
 
 ## Development
