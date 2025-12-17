@@ -38,7 +38,7 @@ def validate_row(row: pd.Series) -> List[Anomaly]:
         )
 
     # Required fields
-    for col in ["first_name", "last_name", "email", "phone", "status", "birth_date", "created_at"]:
+    for col in ["id", "first_name", "last_name", "email", "phone", "status", "birth_date", "created_at"]:
         if pd.isna(row.get(col)) or str(row.get(col)).strip() == "":
             add(col, "missing value")
 
@@ -82,6 +82,22 @@ def validate_row(row: pd.Series) -> List[Anomaly]:
 
 
 def run_anomaly_checks(df: pd.DataFrame) -> pd.DataFrame:
+    all_anomalies: List[Anomaly] = []
+
+    # Duplicate ID detection (should not happen if rows are never “deleted” and IDs are unique)
+    if "id" in df.columns:
+        dup_ids = df[df["id"].duplicated(keep=False)]
+        for _, row in dup_ids.iterrows():
+            row_id = str(row.get("id", "unknown"))
+            val = str(row.get("id", "")).strip()
+            if val:
+                all_anomalies.append(
+                    Anomaly(row_id=row_id, column="id", value=val, issue="duplicate id")
+                )
+
+    for _, row in df.iterrows():
+        all_anomalies.extend(validate_row(row))
+    return pd.DataFrame([a.__dict__ for a in all_anomalies])
     all_anomalies: List[Anomaly] = []
     for _, row in df.iterrows():
         all_anomalies.extend(validate_row(row))
