@@ -5,7 +5,7 @@ from typing import List, Optional
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from email_validator import EmailNotValidError, validate_email
-from phonenumbers import NumberParseException, is_valid_number, parse as parse_phone
+import re
 
 
 ALLOWED_STATUSES = {"active", "cancelled"}
@@ -50,15 +50,12 @@ def validate_row(row: pd.Series) -> List[Anomaly]:
         except EmailNotValidError as exc:
             add("email", f"invalid email: {exc}", str(email_value))
 
-    # Phone validity (10-digit US numbers)
+    # Phone validity: must be exactly 10 digits (matches target int(10) schema)
     phone_value = row.get("phone")
     if pd.notna(phone_value):
-        try:
-            phone_obj = parse_phone(str(phone_value), region="US")
-            if not is_valid_number(phone_obj):
-                add("phone", "invalid phone number", str(phone_value))
-        except NumberParseException as exc:
-            add("phone", f"invalid phone number: {exc}", str(phone_value))
+        digits = re.sub(r"\\D", "", str(phone_value))
+        if len(digits) != 10:
+            add("phone", "phone must be exactly 10 digits", str(phone_value))
 
     # Status validity
     status_value = str(row.get("status", "")).lower()
